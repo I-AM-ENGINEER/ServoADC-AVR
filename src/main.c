@@ -10,6 +10,7 @@
 #include <avr/io.h>
 #include <util/delay.h>
 
+// Скважность ШИМ
 #define PDM_MIN_TIMING		1000	// мкс
 #define PDM_MAX_TIMING		2000	// мкс
 
@@ -17,8 +18,11 @@
 #define LCD_PIN_RS			PA5
 #define LCD_PIN_E			PA4
 
+// Порядок экспоненциального скользящего среднего фильтра, 
+// больше - лучше сглаживание, меньше - быстрее реакция  
 #define ADC_FILTER_ORDER	4
 
+// Настройки канала АЦП
 enum adc_channel_e{
 	adc_channel_set = 0x00,
 	adc_channel_min = 0x01,
@@ -82,6 +86,7 @@ ISR(ADC_vect){
 			return;
 	}
 	
+	// Перевод значений из 10 битного числа в угол 0...180
 	uint8_t min_value = pdm_adc2angle(adc_get_filtered(adc_channel_min));
 	uint8_t max_value = pdm_adc2angle(adc_get_filtered(adc_channel_max));
 	uint8_t set_value = pdm_adc2angle(adc_get_filtered(adc_channel_set));
@@ -176,6 +181,7 @@ void lcd_init( void ){
 /******************** Драйвер генератора PDM сигнала ********************/
 
 uint8_t pdm_adc2angle(uint16_t adc10bit){
+	adc10bit+=2; // Небольшой хак, что бы можно было получить дипапозон 0...180, а не 0...179
 	return ((adc10bit/4)*180)/256;
 }
 
@@ -201,17 +207,16 @@ void pdm_set_angle( uint8_t angle ){
 /******************** Высокоуровневые обработчики ********************/
 
 int main( void ){
-	
 	pdm_init();
-	// Нужные пины в режим выхода
+	// Пины дисплея в режим выхода
 	DDRA = 0x3F;
 	// Инициализация дисплея
 	lcd_init();
 	sei(); // Глобальные прерывания включить
 	char print_str[8];
-	adc_init();
-	pdm_set_angle(2);
+	adc_init(); // запуск АЦП
 	while (1){
+		// Отрисовка значений на дисплее
 		lcd_set_cursor(0,0);
 		snprintf(print_str, sizeof(print_str), "%04hu", adc_get_filtered(adc_channel_min));
 		lcd_puts(print_str);
